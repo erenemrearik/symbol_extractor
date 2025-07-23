@@ -12,7 +12,6 @@ namespace symbol_extractor;
 
 class Program
 {
-    // Services can be instantiated here. For larger apps, a dependency injection container would be used.
     private static readonly ConfigurationService ConfigService = new();
     private static readonly SymbolParser SymbolParser = new();
     private static readonly ApiService ApiService = new(SymbolParser);
@@ -31,7 +30,6 @@ class Program
         }
         catch (Exception ex)
         {
-            // A global error handler for any unexpected issues.
             ConsoleUi.DisplayMessage($"\nAn unexpected error occurred: {ex.Message}", true);
         }
 
@@ -46,7 +44,6 @@ class Program
             ? ConsoleUi.GetDesktopPath()
             : settings.DefaultSavePath;
 
-        // Ensure the directory exists
         Directory.CreateDirectory(savePath);
 
         switch (mode)
@@ -114,7 +111,7 @@ class Program
     private static async Task RunSymbolExtractMode(string savePath)
     {
         List<SymbolInfo> symbols;
-        var sourceChoice = ConsoleUi.GetInputJson(); // This now handles the logic
+        var sourceChoice = ConsoleUi.GetInputJson();
 
         if (sourceChoice.StartsWith("http", StringComparison.OrdinalIgnoreCase))
         {
@@ -122,7 +119,7 @@ class Program
         }
         else
         {
-            symbols = ApiService.ExtractSymbolsFromJson(sourceChoice); // It's already file content
+            symbols = ApiService.ExtractSymbolsFromJson(sourceChoice);
         }
         
         if (symbols == null || !symbols.Any())
@@ -167,7 +164,7 @@ class Program
             return;
         }
 
-        var userSymbols = ConsoleUi.GetUserSymbolList();
+        var userSymbols = ConsoleUi.GetUserSymbols(SymbolParser);
         if (!userSymbols.Any())
         {
             ConsoleUi.DisplayMessage("No symbols were provided by the user.", true);

@@ -8,31 +8,35 @@ namespace symbol_extractor.Services;
 
 public class SymbolComparisonService
 {
-    public (List<SymbolInfo> common, List<SymbolInfo> onlyInApi, List<string> onlyInUser) FindSymbolDifferences(
+    public (List<SymbolInfo> common, List<SymbolInfo> onlyInApi, List<SymbolInfo> onlyInUser) FindSymbolDifferences(
         IEnumerable<SymbolInfo> apiSymbols,
-        IEnumerable<string> userSymbols)
+        IEnumerable<SymbolInfo> userSymbols)
     {
-        var normalizedUserSymbols = new HashSet<string>(
-            userSymbols.Select(SymbolParser.NormalizeSymbol),
-            StringComparer.OrdinalIgnoreCase
-        );
+        var normalizedUserSymbols = userSymbols
+            .ToDictionary(s => SymbolParser.NormalizeSymbol(s.Symbol), s => s, StringComparer.OrdinalIgnoreCase);
 
         var normalizedApiSymbols = apiSymbols
             .ToDictionary(s => SymbolParser.NormalizeSymbol(s.Symbol), s => s, StringComparer.OrdinalIgnoreCase);
 
         var commonSymbols = normalizedApiSymbols
-            .Where(kvp => normalizedUserSymbols.Contains(kvp.Key))
-            .Select(kvp => kvp.Value)
+            .Where(kvp => normalizedUserSymbols.ContainsKey(kvp.Key))
+            .Select(kvp =>
+            {
+                var userSymbol = normalizedUserSymbols[kvp.Key];
+                var apiSymbol = kvp.Value;
+                return new SymbolInfo(apiSymbol.Symbol, apiSymbol.Base, apiSymbol.Quote, userSymbol.Id);
+            })
             .ToList();
 
         var onlyInApi = normalizedApiSymbols
-            .Where(kvp => !normalizedUserSymbols.Contains(kvp.Key))
+            .Where(kvp => !normalizedUserSymbols.ContainsKey(kvp.Key))
             .Select(kvp => kvp.Value)
             .ToList();
-
+        
         var normalizedApiSymbolKeys = new HashSet<string>(normalizedApiSymbols.Keys, StringComparer.OrdinalIgnoreCase);
         var onlyInUser = normalizedUserSymbols
-            .Where(s => !normalizedApiSymbolKeys.Contains(s))
+            .Where(kvp => !normalizedApiSymbolKeys.Contains(kvp.Key))
+            .Select(kvp => kvp.Value)
             .ToList();
 
         return (commonSymbols, onlyInApi, onlyInUser);

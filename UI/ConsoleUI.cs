@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using symbol_extractor.Data;
+using symbol_extractor.Models;
 using symbol_extractor.Services;
 using Spectre.Console;
 
@@ -102,7 +103,7 @@ public static class ConsoleUi
         return AnsiConsole.Ask<string>("Enter the [cyan]API URL[/]:");
     }
 
-    public static HashSet<string> GetUserSymbolList()
+    public static IEnumerable<SymbolInfo> GetUserSymbols(SymbolParser symbolParser)
     {
         var choice = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
@@ -122,20 +123,35 @@ public static class ConsoleUi
                 if (!File.Exists(filePath))
                 {
                     AnsiConsole.MarkupLine("[red]File not found![/]");
-                    return new HashSet<string>();
+                    return new List<SymbolInfo>();
                 }
                 var fileService = new FileService();
-                return new HashSet<string>(fileService.ReadSymbolsFromExcel(filePath), StringComparer.OrdinalIgnoreCase);
-            
+                return fileService.ReadSymbolsFromExcel(filePath)
+                    .Select(s =>
+                    {
+                        var (b, q) = symbolParser.ParseSymbol(s);
+                        return new SymbolInfo(s, b, q);
+                    });
+
             case "Manual entry":
-                return ReadSymbolsFromConsole("[grey]Enter symbols (comma-separated or one per line). End with an empty line:[/]");
-            
+                return ReadSymbolsFromConsole(
+                        "[grey]Enter symbols (comma-separated or one per line). End with an empty line:[/]")
+                    .Select(s =>
+                    {
+                        var (b, q) = symbolParser.ParseSymbol(s);
+                        return new SymbolInfo(s, b, q);
+                    });
+
             case "Use the built-in KTR list":
                 AnsiConsole.MarkupLine("[green]Using the built-in KTR symbol list.[/]");
-                return PredefinedLists.KtrSymbols;
+                return PredefinedLists.KtrSymbols.Select(kvp =>
+                {
+                    var (b, q) = symbolParser.ParseSymbol(kvp.Key);
+                    return new SymbolInfo(kvp.Key, b, q, kvp.Value);
+                });
         }
-        
-        return new HashSet<string>();
+
+        return new List<SymbolInfo>();
     }
 
     public static HashSet<string> ReadSymbolsFromConsole(string prompt)
@@ -154,12 +170,12 @@ public static class ConsoleUi
             {
                 foreach (var part in line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    symbols.Add(SymbolParser.NormalizeSymbol(part.Trim()));
+                    symbols.Add(part.Trim());
                 }
             }
             else
             {
-                symbols.Add(SymbolParser.NormalizeSymbol(line.Trim()));
+                symbols.Add(line.Trim());
             }
         }
         return symbols;

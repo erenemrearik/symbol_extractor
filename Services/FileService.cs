@@ -51,21 +51,18 @@ public class FileService
             using (var workbook = new XLWorkbook())
             {
                 var worksheet = workbook.Worksheets.Add("Symbols");
-                worksheet.Cell(1, 1).Value = "Symbol";
-                worksheet.Cell(1, 2).Value = "Base";
-                worksheet.Cell(1, 3).Value = "Quote";
-
-                worksheet.Row(1).Style.Font.Bold = true;
+                CreateSymbolInfoHeader(worksheet);
 
                 int rowIdx = 2;
                 foreach (var s in symbols)
                 {
-                    worksheet.Cell(rowIdx, 1).Value = s.Symbol;
-                    worksheet.Cell(rowIdx, 2).Value = s.Base;
-                    worksheet.Cell(rowIdx, 3).Value = s.Quote;
+                    worksheet.Cell(rowIdx, 1).Value = s.Id;
+                    worksheet.Cell(rowIdx, 2).Value = s.Symbol;
+                    worksheet.Cell(rowIdx, 3).Value = s.Base;
+                    worksheet.Cell(rowIdx, 4).Value = s.Quote;
                     rowIdx++;
                 }
-                
+
                 worksheet.Columns().AdjustToContents();
                 workbook.SaveAs(filePath);
             }
@@ -79,41 +76,31 @@ public class FileService
     public void SaveComparisonReportToExcel(
         IEnumerable<SymbolInfo> commonSymbols,
         IEnumerable<SymbolInfo> onlyInApi,
-        IEnumerable<string> onlyInUser,
+        IEnumerable<SymbolInfo> onlyInUser,
         string filePath)
     {
         try
         {
             using (var workbook = new XLWorkbook())
             {
-                // Sheet for Common Symbols
                 if (commonSymbols.Any())
                 {
-                    var wsCommon = workbook.Worksheets.Add("Common Symbols");
-                    CreateSymbolInfoHeader(wsCommon);
-                    wsCommon.Cell(2, 1).InsertData(commonSymbols);
-                    wsCommon.Columns().AdjustToContents();
+                    var ws = workbook.Worksheets.Add("Common Symbols");
+                    PopulateSymbolInfoSheet(ws, commonSymbols);
                 }
 
-                // Sheet for Symbols Only In API
                 if (onlyInApi.Any())
                 {
-                    var wsApi = workbook.Worksheets.Add("Only In API");
-                    CreateSymbolInfoHeader(wsApi);
-                    wsApi.Cell(2, 1).InsertData(onlyInApi);
-                    wsApi.Columns().AdjustToContents();
+                    var ws = workbook.Worksheets.Add("Only In API");
+                    PopulateSymbolInfoSheet(ws, onlyInApi);
                 }
 
-                // Sheet for Symbols Only In User's List
                 if (onlyInUser.Any())
                 {
-                    var wsUser = workbook.Worksheets.Add("Only In User List");
-                    wsUser.Cell(1, 1).Value = "Symbol";
-                    wsUser.Row(1).Style.Font.Bold = true;
-                    wsUser.Cell(2, 1).InsertData(onlyInUser);
-                    wsUser.Columns().AdjustToContents();
+                    var ws = workbook.Worksheets.Add("Only In User List");
+                    PopulateSymbolInfoSheet(ws, onlyInUser);
                 }
-                
+
                 workbook.SaveAs(filePath);
             }
         }
@@ -123,11 +110,27 @@ public class FileService
         }
     }
 
+    private void PopulateSymbolInfoSheet(IXLWorksheet worksheet, IEnumerable<SymbolInfo> symbols)
+    {
+        CreateSymbolInfoHeader(worksheet);
+        int currentRow = 2;
+        foreach (var symbol in symbols)
+        {
+            worksheet.Cell(currentRow, 1).Value = symbol.Id;
+            worksheet.Cell(currentRow, 2).Value = symbol.Symbol;
+            worksheet.Cell(currentRow, 3).Value = symbol.Base;
+            worksheet.Cell(currentRow, 4).Value = symbol.Quote;
+            currentRow++;
+        }
+        worksheet.Columns().AdjustToContents();
+    }
+
     private void CreateSymbolInfoHeader(IXLWorksheet worksheet)
     {
-        worksheet.Cell(1, 1).Value = "Symbol";
-        worksheet.Cell(1, 2).Value = "Base";
-        worksheet.Cell(1, 3).Value = "Quote";
+        worksheet.Cell(1, 1).Value = "Id";
+        worksheet.Cell(1, 2).Value = "Symbol";
+        worksheet.Cell(1, 3).Value = "Base";
+        worksheet.Cell(1, 4).Value = "Quote";
         worksheet.Row(1).Style.Font.Bold = true;
     }
 } 
