@@ -1,0 +1,58 @@
+## Visual Studio and .NET Core ##
+.vs/
+bin/
+obj/
+*.suo
+*.user
+*.vsidx
+*.pdb
+*.exe
+*.dll
+*.cache
+*.ilk
+*.exp
+*.lib
+*.log
+*.nupkg
+
+## Build results ##
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+## NuGet ##
+.nuget/
+packages/
+*.nupkg
+NuGet.exe
+.nupkg
+
+## Project files ##
+*.userprefs
+*.csproj.user
+*.pubxml
+*.publishsettings
+
+## VS Code ##
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+## Other ##
+*.swp
+*.swo
+*~
+*.orig
+.DS_Store
+*.pyc
