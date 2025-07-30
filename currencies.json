@@ -1,6 +1,6 @@
 [
   "USDT", "BTC", "ETH", "BNB", "BUSD", "TRY", "USD", "EUR",
-  "SOL", "DOGE", "ADA", "XRP", "AVAX", "TRX", "SHIB", "MATIC", "DOT", "LTC", "LINK",
-  "USDC", "DAI", "TUSD", "UST", "USDP",
+  "SOL", "DOGE", "ADA", "XRP", "AVAX", "TRX", "SHIB", "MATIC", "DOT", "LTC", "LINK", "ICPX", "PAX", "TUSD", 
+  "USDC", "DAI", "TUSD", "UST", "USDP", "USDM", "USDS", 
   "GBP", "JPY", "CHF", "CAD", "AUD", "CNY", "RUB"
 ] 

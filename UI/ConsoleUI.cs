@@ -32,11 +32,12 @@ public static class ConsoleUi
         return AnsiConsole.Prompt(
             new SelectionPrompt<AppMode>()
                 .Title("Select a [green]mode[/]:")
-                .PageSize(5)
+                .PageSize(6)
                 .AddChoices(new[]
                 {
                     AppMode.SymbolExtract,
                     AppMode.Compare,
+                    AppMode.MultiListCompare,
                     AppMode.Match,
                     AppMode.ManageCurrencies
                 }));
@@ -242,7 +243,189 @@ public static class ConsoleUi
     {
         return path?.Trim().Trim('"') ?? string.Empty;
     }
+
+    public static string GetListName(int listNumber)
+    {
+        return AnsiConsole.Ask<string>($"[cyan]Enter name for List {listNumber}[/] (e.g., 'API Symbols', 'User List', 'Exchange A'):");
+    }
+
+    public static SymbolList GetSymbolList(SymbolParser symbolParser, int listNumber)
+    {
+        var listName = GetListName(listNumber);
+        AnsiConsole.MarkupLine($"[green]Collecting symbols for '{listName}'...[/]");
+        
+        var symbols = GetUserSymbols(symbolParser).ToList();
+        
+        if (!symbols.Any())
+        {
+            AnsiConsole.MarkupLine("[red]No symbols were provided for this list.[/]");
+            return new SymbolList(listName, new List<SymbolInfo>());
+        }
+
+        AnsiConsole.MarkupLine($"[green]Added {symbols.Count} symbols to '{listName}'.[/]");
+        return new SymbolList(listName, symbols);
+    }
+
+    public static bool ShouldContinueAddingLists()
+    {
+        AnsiConsole.WriteLine();
+        var choice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("Do you want to add another symbol list?")
+                .AddChoices(new[] { "Yes, add another list", "No, start comparison" }));
+
+        return choice == "Yes, add another list";
+    }
+
+    public static void DisplayMultiListSummary(List<SymbolList> symbolLists, List<SymbolInfo> commonSymbols)
+    {
+        var table = new Table().Title("Multi-List Comparison Summary").Centered();
+        table.AddColumn("List Name");
+        table.AddColumn("Symbol Count");
+        table.AddColumn("Status");
+
+        foreach (var list in symbolLists)
+        {
+            table.AddRow(
+                $"[bold]{list.Name}[/]", 
+                $"[green]{list.Symbols.Count}[/]",
+                list.Symbols.Count > 0 ? "[green]✓[/]" : "[red]✗[/]"
+            );
+        }
+
+        AnsiConsole.Write(table);
+        
+        if (commonSymbols.Any())
+        {
+            AnsiConsole.MarkupLine($"\n[bold green]Common symbols found: {commonSymbols.Count}[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("\n[red]No common symbols found across all lists.[/]");
+        }
+    }
+
+    public static void DisplayValidationSummary(
+        List<SymbolParseError> parseErrors,
+        List<DuplicateSymbol> duplicateSymbols,
+        List<SymbolParseInconsistency> parseInconsistencies)
+    {
+        var table = new Table().Title("Validation Summary").Centered();
+        table.AddColumn("Issue Type");
+        table.AddColumn("Count");
+        table.AddColumn("Status");
+
+        table.AddRow(
+            "Parse Errors", 
+            $"[red]{parseErrors.Count}[/]",
+            parseErrors.Count > 0 ? "[red]⚠[/]" : "[green]✓[/]"
+        );
+
+        table.AddRow(
+            "Duplicate Symbols", 
+            $"[yellow]{duplicateSymbols.Count}[/]",
+            duplicateSymbols.Count > 0 ? "[yellow]⚠[/]" : "[green]✓[/]"
+        );
+
+        table.AddRow(
+            "Parse Inconsistencies", 
+            $"[orange1]{parseInconsistencies.Count}[/]",
+            parseInconsistencies.Count > 0 ? "[orange1]⚠[/]" : "[green]✓[/]"
+        );
+
+        AnsiConsole.Write(table);
+    }
+
+    public static void DisplayParseErrors(List<SymbolParseError> parseErrors)
+    {
+        if (!parseErrors.Any()) return;
+
+        var table = new Table().Title("Parse Errors").Centered();
+        table.AddColumn("Symbol");
+        table.AddColumn("List");
+        table.AddColumn("Error");
+        table.AddColumn("Stored Base/Quote");
+        table.AddColumn("Parsed Base/Quote");
+
+        foreach (var error in parseErrors.Take(10)) // Show first 10 errors
+        {
+            table.AddRow(
+                $"[red]{error.Symbol}[/]",
+                error.ListName,
+                error.ErrorMessage,
+                $"{error.StoredBase}/{error.StoredQuote}",
+                $"{error.ParsedBase}/{error.ParsedQuote}"
+            );
+        }
+
+        AnsiConsole.Write(table);
+        
+        if (parseErrors.Count > 10)
+        {
+            AnsiConsole.MarkupLine($"[grey]... and {parseErrors.Count - 10} more errors (see Excel report for details)[/]");
+        }
+    }
+
+    public static void DisplayDuplicateSymbols(List<DuplicateSymbol> duplicateSymbols)
+    {
+        if (!duplicateSymbols.Any()) return;
+
+        var table = new Table().Title("Duplicate Symbols").Centered();
+        table.AddColumn("Normalized Symbol");
+        table.AddColumn("Occurrences");
+        table.AddColumn("Lists");
+
+        foreach (var duplicate in duplicateSymbols.Take(10)) // Show first 10 duplicates
+        {
+            var listNames = string.Join(", ", duplicate.Occurrences.Select(o => o.ListName).Distinct());
+            table.AddRow(
+                $"[yellow]{duplicate.NormalizedSymbol}[/]",
+                $"[bold]{duplicate.Occurrences.Count}[/]",
+                listNames
+            );
+        }
+
+        AnsiConsole.Write(table);
+        
+        if (duplicateSymbols.Count > 10)
+        {
+            AnsiConsole.MarkupLine($"[grey]... and {duplicateSymbols.Count - 10} more duplicates (see Excel report for details)[/]");
+        }
+    }
+
+    public static void DisplayParseInconsistencies(List<SymbolParseInconsistency> parseInconsistencies)
+    {
+        if (!parseInconsistencies.Any()) return;
+
+        var table = new Table().Title("Parse Inconsistencies").Centered();
+        table.AddColumn("Normalized Symbol");
+        table.AddColumn("Lists");
+        table.AddColumn("Different Parsings");
+
+        foreach (var inconsistency in parseInconsistencies.Take(10)) // Show first 10 inconsistencies
+        {
+            var listNames = string.Join(", ", inconsistency.ParseInfos.Select(p => p.ListName).Distinct());
+            var uniqueParsings = inconsistency.ParseInfos
+                .Select(p => $"{p.ParsedBase}/{p.ParsedQuote}")
+                .Distinct()
+                .ToList();
+            var parsingText = string.Join(", ", uniqueParsings);
+            
+            table.AddRow(
+                $"[orange1]{inconsistency.NormalizedSymbol}[/]",
+                listNames,
+                parsingText
+            );
+        }
+
+        AnsiConsole.Write(table);
+        
+        if (parseInconsistencies.Count > 10)
+        {
+            AnsiConsole.MarkupLine($"[grey]... and {parseInconsistencies.Count - 10} more inconsistencies (see Excel report for details)[/]");
+        }
+    }
 }
 
-public enum AppMode { SymbolExtract = 1, Compare = 2, Match = 3, ManageCurrencies = 4 }
+public enum AppMode { SymbolExtract = 1, Compare = 2, MultiListCompare = 3, Match = 4, ManageCurrencies = 5 }
 public enum OutputType { Txt, Excel } 

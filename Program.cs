@@ -17,6 +17,8 @@ class Program
     private static readonly ApiService ApiService = new(SymbolParser);
     private static readonly FileService FileService = new();
     private static readonly SymbolComparisonService ComparisonService = new();
+    private static readonly MultiListComparisonService MultiListComparisonService = new(SymbolParser);
+    private static readonly SymbolValidationService ValidationService = new(SymbolParser);
     private static readonly StatisticsService StatisticsService = new();
 
     static async Task Main(string[] args)
@@ -53,6 +55,9 @@ class Program
                 break;
             case AppMode.Compare:
                 await RunCompareMode(savePath);
+                break;
+            case AppMode.MultiListCompare:
+                await RunMultiListCompareMode(savePath);
                 break;
             case AppMode.Match:
                 RunMatchingMode(savePath);
@@ -190,6 +195,81 @@ class Program
         table.AddRow("[red]Only in API[/]", $"[bold red]{onlyInApi.Count}[/]");
         table.AddRow("[yellow]Only in your list[/]", $"[bold yellow]{onlyInUser.Count}[/]");
         AnsiConsole.Write(table);
+    }
+
+    /// <summary>
+    /// Compares multiple symbol lists and finds common symbols across all lists.
+    /// </summary>
+    private static async Task RunMultiListCompareMode(string savePath)
+    {
+        var symbolLists = new List<SymbolList>();
+        int listNumber = 1;
+
+        AnsiConsole.MarkupLine("[bold cyan]Multi-List Symbol Comparison[/]");
+        AnsiConsole.MarkupLine("[grey]This mode allows you to compare multiple symbol lists and find common symbols.[/]\n");
+
+        while (true)
+        {
+            var symbolList = ConsoleUi.GetSymbolList(SymbolParser, listNumber);
+            symbolLists.Add(symbolList);
+
+            if (!ConsoleUi.ShouldContinueAddingLists())
+                break;
+
+            listNumber++;
+        }
+
+        var validLists = symbolLists.Where(list => list.Symbols.Any()).ToList();
+        if (validLists.Count < 2)
+        {
+            ConsoleUi.DisplayMessage("At least 2 symbol lists with symbols are required for comparison.", true);
+            return;
+        }
+
+        AnsiConsole.MarkupLine("\n[bold yellow]Validating symbol parsing and checking for issues...[/]");
+        
+        var parseErrors = ValidationService.ValidateSymbolParsing(validLists);
+        var duplicateSymbols = ValidationService.FindDuplicateSymbols(validLists);
+        var parseInconsistencies = ValidationService.FindParseInconsistencies(validLists);
+
+        ConsoleUi.DisplayValidationSummary(parseErrors, duplicateSymbols, parseInconsistencies);
+
+        if (parseErrors.Any())
+        {
+            ConsoleUi.DisplayParseErrors(parseErrors);
+        }
+
+        if (duplicateSymbols.Any())
+        {
+            ConsoleUi.DisplayDuplicateSymbols(duplicateSymbols);
+        }
+
+        if (parseInconsistencies.Any())
+        {
+            ConsoleUi.DisplayParseInconsistencies(parseInconsistencies);
+        }
+
+        var commonSymbols = MultiListComparisonService.FindCommonSymbols(validLists);
+        var uniqueSymbolsPerList = MultiListComparisonService.GetUniqueSymbolsPerList(validLists);
+
+        ConsoleUi.DisplayMultiListSummary(validLists, commonSymbols);
+
+        var outputFile = Path.Combine(savePath, "MultiListComparison.xlsx");
+        FileService.SaveMultiListComparisonToExcel(validLists, commonSymbols, uniqueSymbolsPerList, outputFile);
+
+        // Save validation report if there are issues
+        if (parseErrors.Any() || duplicateSymbols.Any() || parseInconsistencies.Any())
+        {
+            var validationFile = Path.Combine(savePath, "ValidationReport.xlsx");
+            FileService.SaveValidationReportToExcel(parseErrors, duplicateSymbols, parseInconsistencies, validationFile);
+            ConsoleUi.DisplayMessage($"\nValidation report saved to '[yellow]{validationFile}[/]'.");
+        }
+
+        ConsoleUi.DisplayMessage($"\nMulti-list comparison report saved to '[yellow]{outputFile}[/]'.");
+        ConsoleUi.DisplayMessage("The Excel file contains:");
+        ConsoleUi.DisplayMessage("• Common Symbols sheet - symbols found in all lists");
+        ConsoleUi.DisplayMessage("• Individual list sheets - all symbols from each list");
+        ConsoleUi.DisplayMessage("• Unique sheets - symbols unique to each list");
     }
 
     /// <summary>

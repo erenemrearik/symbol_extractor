@@ -110,6 +110,135 @@ public class FileService
         }
     }
 
+    public void SaveMultiListComparisonToExcel(
+        List<SymbolList> symbolLists,
+        List<SymbolInfo> commonSymbols,
+        Dictionary<string, List<SymbolInfo>> uniqueSymbolsPerList,
+        string filePath)
+    {
+        try
+        {
+            using (var workbook = new XLWorkbook())
+            {
+                // Add Common Symbols sheet
+                if (commonSymbols.Any())
+                {
+                    var commonSheet = workbook.Worksheets.Add("Common Symbols");
+                    PopulateSymbolInfoSheet(commonSheet, commonSymbols);
+                }
+
+                // Add individual list sheets
+                foreach (var list in symbolLists)
+                {
+                    var worksheet = workbook.Worksheets.Add(list.Name);
+                    PopulateSymbolInfoSheet(worksheet, list.Symbols);
+                }
+
+                // Add unique symbols sheets
+                foreach (var kvp in uniqueSymbolsPerList)
+                {
+                    if (kvp.Value.Any())
+                    {
+                        var uniqueSheet = workbook.Worksheets.Add($"{kvp.Key} - Unique");
+                        PopulateSymbolInfoSheet(uniqueSheet, kvp.Value);
+                    }
+                }
+
+                workbook.SaveAs(filePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving multi-list comparison to Excel: {ex.Message}");
+        }
+    }
+
+    public void SaveValidationReportToExcel(
+        List<SymbolParseError> parseErrors,
+        List<DuplicateSymbol> duplicateSymbols,
+        List<SymbolParseInconsistency> parseInconsistencies,
+        string filePath)
+    {
+        try
+        {
+            using (var workbook = new XLWorkbook())
+            {
+                // Parse Errors sheet
+                if (parseErrors.Any())
+                {
+                    var errorSheet = workbook.Worksheets.Add("Parse Errors");
+                    CreateParseErrorHeader(errorSheet);
+                    
+                    int row = 2;
+                    foreach (var error in parseErrors)
+                    {
+                        errorSheet.Cell(row, 1).Value = error.Symbol;
+                        errorSheet.Cell(row, 2).Value = error.ListName;
+                        errorSheet.Cell(row, 3).Value = error.ErrorMessage;
+                        errorSheet.Cell(row, 4).Value = error.StoredBase;
+                        errorSheet.Cell(row, 5).Value = error.StoredQuote;
+                        errorSheet.Cell(row, 6).Value = error.ParsedBase;
+                        errorSheet.Cell(row, 7).Value = error.ParsedQuote;
+                        row++;
+                    }
+                    errorSheet.Columns().AdjustToContents();
+                }
+
+                // Duplicate Symbols sheet
+                if (duplicateSymbols.Any())
+                {
+                    var duplicateSheet = workbook.Worksheets.Add("Duplicate Symbols");
+                    CreateDuplicateSymbolHeader(duplicateSheet);
+                    
+                    int row = 2;
+                    foreach (var duplicate in duplicateSymbols)
+                    {
+                        foreach (var occurrence in duplicate.Occurrences)
+                        {
+                            duplicateSheet.Cell(row, 1).Value = duplicate.NormalizedSymbol;
+                            duplicateSheet.Cell(row, 2).Value = occurrence.Symbol;
+                            duplicateSheet.Cell(row, 3).Value = occurrence.Base;
+                            duplicateSheet.Cell(row, 4).Value = occurrence.Quote;
+                            duplicateSheet.Cell(row, 5).Value = occurrence.ListName;
+                            row++;
+                        }
+                    }
+                    duplicateSheet.Columns().AdjustToContents();
+                }
+
+                // Parse Inconsistencies sheet
+                if (parseInconsistencies.Any())
+                {
+                    var inconsistencySheet = workbook.Worksheets.Add("Parse Inconsistencies");
+                    CreateParseInconsistencyHeader(inconsistencySheet);
+                    
+                    int row = 2;
+                    foreach (var inconsistency in parseInconsistencies)
+                    {
+                        foreach (var parseInfo in inconsistency.ParseInfos)
+                        {
+                            inconsistencySheet.Cell(row, 1).Value = inconsistency.NormalizedSymbol;
+                            inconsistencySheet.Cell(row, 2).Value = parseInfo.Symbol;
+                            inconsistencySheet.Cell(row, 3).Value = parseInfo.StoredBase;
+                            inconsistencySheet.Cell(row, 4).Value = parseInfo.StoredQuote;
+                            inconsistencySheet.Cell(row, 5).Value = parseInfo.ParsedBase;
+                            inconsistencySheet.Cell(row, 6).Value = parseInfo.ParsedQuote;
+                            inconsistencySheet.Cell(row, 7).Value = parseInfo.ListName;
+                            row++;
+                        }
+                    }
+                    inconsistencySheet.Columns().AdjustToContents();
+                }
+
+                workbook.SaveAs(filePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving validation report to Excel: {ex.Message}");
+        }
+    }
+
     private void PopulateSymbolInfoSheet(IXLWorksheet worksheet, IEnumerable<SymbolInfo> symbols)
     {
         CreateSymbolInfoHeader(worksheet);
@@ -131,6 +260,40 @@ public class FileService
         worksheet.Cell(1, 2).Value = "Symbol";
         worksheet.Cell(1, 3).Value = "Base";
         worksheet.Cell(1, 4).Value = "Quote";
+        worksheet.Row(1).Style.Font.Bold = true;
+    }
+
+    private void CreateParseErrorHeader(IXLWorksheet worksheet)
+    {
+        worksheet.Cell(1, 1).Value = "Symbol";
+        worksheet.Cell(1, 2).Value = "List Name";
+        worksheet.Cell(1, 3).Value = "Error Message";
+        worksheet.Cell(1, 4).Value = "Stored Base";
+        worksheet.Cell(1, 5).Value = "Stored Quote";
+        worksheet.Cell(1, 6).Value = "Parsed Base";
+        worksheet.Cell(1, 7).Value = "Parsed Quote";
+        worksheet.Row(1).Style.Font.Bold = true;
+    }
+
+    private void CreateDuplicateSymbolHeader(IXLWorksheet worksheet)
+    {
+        worksheet.Cell(1, 1).Value = "Normalized Symbol";
+        worksheet.Cell(1, 2).Value = "Original Symbol";
+        worksheet.Cell(1, 3).Value = "Base";
+        worksheet.Cell(1, 4).Value = "Quote";
+        worksheet.Cell(1, 5).Value = "List Name";
+        worksheet.Row(1).Style.Font.Bold = true;
+    }
+
+    private void CreateParseInconsistencyHeader(IXLWorksheet worksheet)
+    {
+        worksheet.Cell(1, 1).Value = "Normalized Symbol";
+        worksheet.Cell(1, 2).Value = "Original Symbol";
+        worksheet.Cell(1, 3).Value = "Stored Base";
+        worksheet.Cell(1, 4).Value = "Stored Quote";
+        worksheet.Cell(1, 5).Value = "Parsed Base";
+        worksheet.Cell(1, 6).Value = "Parsed Quote";
+        worksheet.Cell(1, 7).Value = "List Name";
         worksheet.Row(1).Style.Font.Bold = true;
     }
 } 
